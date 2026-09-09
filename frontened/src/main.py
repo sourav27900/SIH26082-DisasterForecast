@@ -868,7 +868,7 @@ with tab1:
         data="https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
         min_zoom=0,
         max_zoom=20,
-        tile_size=256,
+        tile_sijze=256,
         opacity=1.0,
         pickable=False,
     )

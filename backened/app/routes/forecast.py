@@ -39,6 +39,7 @@ async def create_forecast(
     wbgt_service: WBGTService = Depends(get_wbgt_service),
     alert_service: AlertService = Depends(get_alert_service),
     # data_service: Optional[DataService] = None
+    data_service: DataService = Depends(get_data_service)
 ) -> ForecastResponse:
     """
     Generate forecast for a location.

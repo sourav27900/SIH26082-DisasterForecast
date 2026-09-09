@@ -32,7 +32,8 @@ async def get_location_data(
     location: str,
     days_back: int = Query(7, ge=1, le=365, description="Number of past days to return"),
     resolution: str = Query("hourly", description="Data resolution: 'hourly', 'daily'"),
-    data_service: Optional[DataService] = None
+    # data_service: Optional[DataService] = None
+    data_service: DataService = Depends(get_data_service) 
 ) -> DataResponse:
     """
     Get historical PM2.5 data for a location.
