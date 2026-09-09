@@ -38,7 +38,7 @@ async def create_forecast(
     model_service: XGBoostModelService = Depends(get_model_service),
     wbgt_service: WBGTService = Depends(get_wbgt_service),
     alert_service: AlertService = Depends(get_alert_service),
-    data_service: Optional[DataService] = None
+    # data_service: Optional[DataService] = None
 ) -> ForecastResponse:
     """
     Generate forecast for a location.

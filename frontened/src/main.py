@@ -1,10 +1,27 @@
 import streamlit as st
+import requests
 import pandas as pd
 import numpy as np
 import pydeck as pdk
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
+
+
+# Backend URL
+BACKEND_URL = "http://127.0.0.1:8000"
+
+# Test backend connection
+try:
+    health = requests.get(f"{BACKEND_URL}/health", timeout=3)
+    if health.status_code == 200:
+        st.success("✅ Backend connected successfully!")
+    else:
+        st.warning(f"⚠️ Backend returned status: {health.status_code}")
+except requests.exceptions.ConnectionError:
+    st.error("🚨 Cannot connect to backend. Run `python main.py` in the backend folder.")
+
+    
 
 # ============================================================
 # 1. PAGE CONFIGURATION
@@ -406,10 +423,39 @@ seed = st.sidebar.number_input(
 # ============================================================
 # 5. DATA GENERATION
 # ============================================================
+
+# 1. REAL BACKEND FORECAST FETCHER
+@st.cache_data(ttl=60)  # Cache for 60 seconds to avoid spamming the backend
+def fetch_backend_forecast(location: str, hours: int) -> pd.DataFrame:
+    """Fetches real forecast data from the FastAPI backend."""
+    try:
+        response = requests.post(
+            f"{BACKEND_URL}/api/v1/forecast",
+            json={
+                "location": location,
+                "hours_ahead": hours,
+                "include_uncertainty": True
+            },
+            timeout=5
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        # Convert the nested "points" list into a flat Pandas DataFrame
+        df = pd.DataFrame(data["points"])
+        
+        # Add a "Time" column to match what your existing frontend charts expect
+        df["Time"] = pd.to_datetime(df["timestamp"]).dt.strftime("%H:%M")
+        return df
+    except Exception as e:
+        st.error(f"⚠️ Failed to fetch forecast from backend: {e}")
+        return None
+
+
+# 2. MOCK DATA GENERATORS (For parts of the dashboard without backend endpoints yet)
 @st.cache_data(show_spinner=False)
 def generate_stations(seed_value: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed_value)
-
     names = [x[0] for x in STATIONS]
     latitudes = [x[1] for x in STATIONS]
     longitudes = [x[2] for x in STATIONS]
@@ -427,109 +473,50 @@ def generate_stations(seed_value: int) -> pd.DataFrame:
         default="Normal",
     )
 
-    df = pd.DataFrame(
-        {
-            "name": names,
-            "latitude": latitudes,
-            "longitude": longitudes,
-            "temperature": temperature,
-            "humidity": humidity,
-            "wind_speed": wind_speed,
-            "aqi": aqi,
-            "pm25": pm25,
-            "pm10": pm10,
-            "thermal_stress": thermal_stress,
-        }
-    )
-
-    # A simple demo index. It is explicitly a simulation metric, not UTCI.
-    df["Thermal_Stress_Index"] = (
-        df["temperature"] * (1 + df["humidity"] / 200)
-        - df["wind_speed"] * 0.08
-    )
-
+    df = pd.DataFrame({
+        "name": names, "latitude": latitudes, "longitude": longitudes,
+        "temperature": temperature, "humidity": humidity, "wind_speed": wind_speed,
+        "aqi": aqi, "pm25": pm25, "pm10": pm10, "thermal_stress": thermal_stress,
+    })
+    df["Thermal_Stress_Index"] = df["temperature"] * (1 + df["humidity"] / 200) - df["wind_speed"] * 0.08
     return df
 
-
 @st.cache_data(show_spinner=False)
-def generate_forecast(seed_value: int, hours: int) -> pd.DataFrame:
+def generate_forecast_fallback(seed_value: int, hours: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed_value + 100)
     hour_index = np.arange(hours)
     now = datetime.now().replace(minute=0, second=0, microsecond=0)
-
-    # Diurnal temperature pattern.
     temp_base = 40.5
     temp_cycle = 3.2 * np.sin(2 * np.pi * (hour_index - 6) / 24)
     temperature = temp_base + temp_cycle + rng.normal(0, 0.45, hours)
-
-    # Pollution is modeled independently with a mild inverse relationship
-    # to temperature plus random variation for demonstration purposes.
     aqi_base = 315
     aqi_cycle = -18 * np.sin(2 * np.pi * (hour_index - 6) / 24)
     aqi = np.clip(aqi_base + aqi_cycle + rng.normal(0, 18, hours), 50, 500)
-
-    pm25 = np.clip(
-        195 - 20 * np.sin(2 * np.pi * (hour_index - 6) / 24)
-        + rng.normal(0, 9, hours),
-        20,
-        500,
-    )
-
+    pm25 = np.clip(195 - 20 * np.sin(2 * np.pi * (hour_index - 6) / 24) + rng.normal(0, 9, hours), 20, 500)
     pm10 = np.clip(pm25 * rng.uniform(1.65, 2.05, hours), 40, 700)
-
     timestamps = [now + timedelta(hours=int(h)) for h in hour_index]
-
-    return pd.DataFrame(
-        {
-            "Time": timestamps,
-            "Temperature (°C)": temperature,
-            "AQI": aqi,
-            "PM2.5 (µg/m³)": pm25,
-            "PM10 (µg/m³)": pm10,
-            "NO₂ (µg/m³)": rng.uniform(40, 120, hours),
-            "O₃ (µg/m³)": rng.uniform(30, 90, hours),
-        }
-    )
-
+    return pd.DataFrame({
+        "Time": timestamps, "Temperature (°C)": temperature, "AQI": aqi,
+        "PM2.5 (µg/m³)": pm25, "PM10 (µg/m³)": pm10,
+        "NO₂ (µg/m³)": rng.uniform(40, 120, hours), "O₃ (µg/m³)": rng.uniform(30, 90, hours),
+    })
 
 @st.cache_data(show_spinner=False)
 def generate_weekly(seed_value: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed_value + 200)
-    dates = pd.date_range(
-        start=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
-        periods=7,
-        freq="D",
-    )
-
+    dates = pd.date_range(start=datetime.now(), periods=7, freq="D")
     max_temp = rng.uniform(42, 46, 7)
     min_temp = rng.uniform(31, 37, 7)
     avg_temp = (max_temp + min_temp) / 2
     avg_aqi = rng.uniform(260, 420, 7)
-
-    risk = np.select(
-        [max_temp >= 45, max_temp >= 43, avg_aqi >= 350],
-        ["Severe", "High", "Moderate"],
-        default="Low",
-    )
-
-    return pd.DataFrame(
-        {
-            "Date": dates,
-            "Avg_Temp": avg_temp,
-            "Max_Temp": max_temp,
-            "Min_Temp": min_temp,
-            "Avg_AQI": avg_aqi,
-            "Heatwave_Risk": risk,
-        }
-    )
-
+    risk = np.select([max_temp >= 45, max_temp >= 43, avg_aqi >= 350], ["Severe", "High", "Moderate"], default="Low")
+    return pd.DataFrame({"Date": dates, "Avg_Temp": avg_temp, "Max_Temp": max_temp, "Min_Temp": min_temp, "Avg_AQI": avg_aqi, "Heatwave_Risk": risk})
 
 @st.cache_data(show_spinner=False)
 def generate_heatmap(seed_value: int) -> pd.DataFrame:
     rng = np.random.default_rng(seed_value + 300)
     names = [x[0] for x in STATIONS]
     hours = [f"{h:02d}:00" for h in range(24)]
-
     values = rng.uniform(90, 360, (len(names), 24))
     return pd.DataFrame(values, index=names, columns=hours)
 
@@ -537,16 +524,171 @@ def generate_heatmap(seed_value: int) -> pd.DataFrame:
 # ============================================================
 # 6. LOAD + FILTER DATA
 # ============================================================
+# 1. Try to get REAL forecast from backend first
+forecast = fetch_backend_forecast(location="Anand Vihar", hours=forecast_horizon)
+
+# 2. If backend is down, gracefully fall back to synthetic data so the app doesn't crash
+if forecast is None:
+    forecast = generate_forecast_fallback(seed, forecast_horizon)
+
+# 3. Load the rest of the dashboard data (still using synthetic for now)
 all_data = generate_stations(seed)
-forecast = generate_forecast(seed, forecast_horizon)
 weekly = generate_weekly(seed)
 heatmap = generate_heatmap(seed)
 
+# 4. Apply sidebar filters
 filtered_data = all_data.copy()
 if alert_threshold != "All Levels":
-    filtered_data = filtered_data[
-        filtered_data["thermal_stress"] == alert_threshold
-    ]
+    filtered_data = filtered_data[filtered_data["thermal_stress"] == alert_threshold]
+
+
+
+
+
+
+
+#------------------------------code_break--------------------------
+# @st.cache_data(show_spinner=False)
+# def generate_stations(seed_value: int) -> pd.DataFrame:
+#     rng = np.random.default_rng(seed_value)
+
+#     names = [x[0] for x in STATIONS]
+#     latitudes = [x[1] for x in STATIONS]
+#     longitudes = [x[2] for x in STATIONS]
+
+#     temperature = rng.uniform(38.5, 45.2, len(STATIONS))
+#     humidity = rng.uniform(25, 55, len(STATIONS))
+#     wind_speed = rng.uniform(2, 12, len(STATIONS))
+#     aqi = rng.integers(180, 451, len(STATIONS))
+#     pm25 = rng.uniform(80, 350, len(STATIONS))
+#     pm10 = rng.uniform(150, 500, len(STATIONS))
+
+#     thermal_stress = np.select(
+#         [temperature > 42, temperature > 40],
+#         ["Severe Heatwave", "Moderate Heatwave"],
+#         default="Normal",
+#     )
+
+#     df = pd.DataFrame(
+#         {
+#             "name": names,
+#             "latitude": latitudes,
+#             "longitude": longitudes,
+#             "temperature": temperature,
+#             "humidity": humidity,
+#             "wind_speed": wind_speed,
+#             "aqi": aqi,
+#             "pm25": pm25,
+#             "pm10": pm10,
+#             "thermal_stress": thermal_stress,
+#         }
+#     )
+
+#     # A simple demo index. It is explicitly a simulation metric, not UTCI.
+#     df["Thermal_Stress_Index"] = (
+#         df["temperature"] * (1 + df["humidity"] / 200)
+#         - df["wind_speed"] * 0.08
+#     )
+
+#     return df
+
+
+# @st.cache_data(show_spinner=False)
+# def generate_forecast(seed_value: int, hours: int) -> pd.DataFrame:
+#     rng = np.random.default_rng(seed_value + 100)
+#     hour_index = np.arange(hours)
+#     now = datetime.now().replace(minute=0, second=0, microsecond=0)
+
+#     # Diurnal temperature pattern.
+#     temp_base = 40.5
+#     temp_cycle = 3.2 * np.sin(2 * np.pi * (hour_index - 6) / 24)
+#     temperature = temp_base + temp_cycle + rng.normal(0, 0.45, hours)
+
+#     # Pollution is modeled independently with a mild inverse relationship
+#     # to temperature plus random variation for demonstration purposes.
+#     aqi_base = 315
+#     aqi_cycle = -18 * np.sin(2 * np.pi * (hour_index - 6) / 24)
+#     aqi = np.clip(aqi_base + aqi_cycle + rng.normal(0, 18, hours), 50, 500)
+
+#     pm25 = np.clip(
+#         195 - 20 * np.sin(2 * np.pi * (hour_index - 6) / 24)
+#         + rng.normal(0, 9, hours),
+#         20,
+#         500,
+#     )
+
+#     pm10 = np.clip(pm25 * rng.uniform(1.65, 2.05, hours), 40, 700)
+
+#     timestamps = [now + timedelta(hours=int(h)) for h in hour_index]
+
+#     return pd.DataFrame(
+#         {
+#             "Time": timestamps,
+#             "Temperature (°C)": temperature,
+#             "AQI": aqi,
+#             "PM2.5 (µg/m³)": pm25,
+#             "PM10 (µg/m³)": pm10,
+#             "NO₂ (µg/m³)": rng.uniform(40, 120, hours),
+#             "O₃ (µg/m³)": rng.uniform(30, 90, hours),
+#         }
+#     )
+
+
+# @st.cache_data(show_spinner=False)
+# def generate_weekly(seed_value: int) -> pd.DataFrame:
+#     rng = np.random.default_rng(seed_value + 200)
+#     dates = pd.date_range(
+#         start=datetime.now().replace(hour=0, minute=0, second=0, microsecond=0),
+#         periods=7,
+#         freq="D",
+#     )
+
+#     max_temp = rng.uniform(42, 46, 7)
+#     min_temp = rng.uniform(31, 37, 7)
+#     avg_temp = (max_temp + min_temp) / 2
+#     avg_aqi = rng.uniform(260, 420, 7)
+
+#     risk = np.select(
+#         [max_temp >= 45, max_temp >= 43, avg_aqi >= 350],
+#         ["Severe", "High", "Moderate"],
+#         default="Low",
+#     )
+
+#     return pd.DataFrame(
+#         {
+#             "Date": dates,
+#             "Avg_Temp": avg_temp,
+#             "Max_Temp": max_temp,
+#             "Min_Temp": min_temp,
+#             "Avg_AQI": avg_aqi,
+#             "Heatwave_Risk": risk,
+#         }
+#     )
+
+
+# @st.cache_data(show_spinner=False)
+# def generate_heatmap(seed_value: int) -> pd.DataFrame:
+#     rng = np.random.default_rng(seed_value + 300)
+#     names = [x[0] for x in STATIONS]
+#     hours = [f"{h:02d}:00" for h in range(24)]
+
+#     values = rng.uniform(90, 360, (len(names), 24))
+#     return pd.DataFrame(values, index=names, columns=hours)
+
+
+# ============================================================
+# 6. LOAD + FILTER DATA
+# ============================================================
+# all_data = generate_stations(seed)
+# forecast = generate_forecast(seed, forecast_horizon)
+# weekly = generate_weekly(seed)
+# heatmap = generate_heatmap(seed)
+
+# filtered_data = all_data.copy()
+# if alert_threshold != "All Levels":
+#     filtered_data = filtered_data[
+#         filtered_data["thermal_stress"] == alert_threshold
+#     ]
 
 # ============================================================
 # 7. HEADER
