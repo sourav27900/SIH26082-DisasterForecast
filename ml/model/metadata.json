@@ -1,0 +1,61 @@
+{
+  "pm25_horizons": {
+    "1h": 1,
+    "6h": 6,
+    "12h": 12,
+    "24h": 24,
+    "72h": 72
+  },
+  "other_targets": [
+    "aqi",
+    "pm10",
+    "no2",
+    "so2",
+    "co",
+    "o3"
+  ],
+  "feature_cols": [
+    "latitude",
+    "longitude",
+    "pm25",
+    "pm25_lag_1h",
+    "pm25_lag_3h",
+    "pm25_lag_6h",
+    "pm25_lag_12h",
+    "pm25_lag_24h",
+    "pm25_rolling_mean_3h",
+    "pm25_rolling_mean_6h",
+    "pm25_rolling_mean_24h",
+    "pm25_rolling_std_6h",
+    "hour_sin",
+    "hour_cos",
+    "dow_sin",
+    "dow_cos",
+    "temperature_2m",
+    "relative_humidity_2m",
+    "wind_speed_10m",
+    "wind_direction_sin",
+    "wind_direction_cos",
+    "surface_pressure",
+    "precipitation",
+    "temperature_change_3h",
+    "ventilation_index",
+    "spatial_pm25_neighbors",
+    "spatial_aqi_neighbors"
+  ],
+  "model_keys": [
+    "pm25_1h",
+    "pm25_6h",
+    "pm25_12h",
+    "pm25_24h",
+    "pm25_72h",
+    "aqi_6h",
+    "pm10_6h",
+    "no2_6h",
+    "so2_6h",
+    "co_6h",
+    "o3_6h"
+  ],
+  "cutoff_train": "2026-08-25 15:00:00",
+  "cutoff_val": "2026-08-29 23:00:00"
+}
