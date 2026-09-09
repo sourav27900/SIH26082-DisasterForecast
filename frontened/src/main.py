@@ -433,6 +433,7 @@ def fetch_backend_forecast(location: str, hours: int) -> pd.DataFrame:
             f"{BACKEND_URL}/api/v1/forecast",
             json={
                 "location": location,
+                "date": datetime.now().strftime("%Y-%m-%d"), 
                 "hours_ahead": hours,
                 "include_uncertainty": True
             },
