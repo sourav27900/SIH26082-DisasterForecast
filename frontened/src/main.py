@@ -6,10 +6,15 @@ import pydeck as pdk
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
+import os
 
 
 # Backend URL
-BACKEND_URL = "http://127.0.0.1:8000"
+backened_url = os.getenv("Backend URL")
+if not backened_url:
+    backened_url= "http://localhost:8000"
+    
+
 
 # Test backend connection
 try:
