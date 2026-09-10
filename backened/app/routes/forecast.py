@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["forecast"])
 
 
-@router.post(
+@router.get(
     "/forecast",
     response_model=ForecastResponse,
     summary="Generate 24-hour forecast",
