@@ -419,7 +419,7 @@ class XGBoostModelService(BasePredictorService):
 _model_service: Optional[XGBoostModelService] = None
 
 
-def get_model_service(model_path: Path, metadata_path: Optional[Path] = None) -> XGBoostModelService:
+def get_model_service() -> XGBoostModelService:
     """
     Get or create model service (singleton pattern).
     
@@ -432,7 +432,19 @@ def get_model_service(model_path: Path, metadata_path: Optional[Path] = None) ->
     
     if _model_service is None:
         logger.info("🔧 Initializing model service...")
-        _model_service = XGBoostModelService(model_path, metadata_path)
+        from config import get_settings
+        settings = get_settings()
+                
+        _model_service = XGBoostModelService(
+            model_path=settings.model_path,
+            feature_metadata_path=settings.feature_metadata_path
+        )
+
+        # _model_service = XGBoostModelService(model_path, metadata_path)
+        _model_service = XGBoostModelService(
+                model_path=settings.model_path,
+                feature_metadata_path=settings.feature_metadata_path
+            )
     
     return _model_service
 

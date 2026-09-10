@@ -347,23 +347,42 @@ class DataService:
 _data_service: Optional[DataService] = None
 
 
-def get_data_service(data_path: Path) -> DataService:
+# def get_data_service() -> DataService:
+#     """
+#     Get or create data service (singleton).
+    
+#     Usage in routes:
+#         @app.get("/data/{location}")
+#         def get_data(location: str, service: DataService = Depends(get_data_service)):
+#             data = service.get_location_data(location)
+#     """
+#     global _data_service
+    
+#     if _data_service is None:
+#         logger.info("🔧 Initializing data service...")
+#         _data_service = DataService(data_path)
+    
+_data_service: Optional[DataService] = None
+
+
+def get_data_service() -> DataService:
     """
     Get or create data service (singleton).
-    
-    Usage in routes:
-        @app.get("/data/{location}")
-        def get_data(location: str, service: DataService = Depends(get_data_service)):
-            data = service.get_location_data(location)
+    Reads data_path automatically from config.py.
     """
     global _data_service
     
     if _data_service is None:
         logger.info("🔧 Initializing data service...")
-        _data_service = DataService(data_path)
+        
+        # 1. Get the settings from config.py
+        from config import get_settings
+        settings = get_settings()
+        
+        # 2. Pass settings.data_path into the DataService class
+        _data_service = DataService(settings.data_path)
     
     return _data_service
-
 
 # ============================================
 # TESTING

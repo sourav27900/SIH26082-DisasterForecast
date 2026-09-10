@@ -24,7 +24,7 @@ from config import get_settings
 
 # Import route modules (these will be created in routes/ folder)
 # Uncomment as each route file is created
-from app.routes import health , forecast # alerts, data
+from app.routes import health , forecast , alerts, data
 
 # STARTUP & SHUTDOWN EVENTS
 
@@ -103,8 +103,8 @@ Structure:
 # TODO: Uncomment these once route files are created
 app.include_router(health.router, tags=["health"])
 app.include_router(forecast.router, tags=["forecast"])
-# app.include_router(alerts.router, tags=["alerts"])
-# app.include_router(data.router, tags=["data"])
+app.include_router(alerts.router, tags=["alerts"])
+app.include_router(data.router, tags=["data"])
 
 
 # FALLBACK ROOT ENDPOINT

@@ -431,7 +431,7 @@ def get_wbgt_service(thresholds: Optional[Dict[str, float]] = None) -> WBGTServi
     
     if _wbgt_service is None:
         logger.info("🔧 Initializing WBGT service...")
-        _wbgt_service = WBGTService(thresholds)
+        _wbgt_service = WBGTService(thresholds=NONE)
     
     return _wbgt_service
 

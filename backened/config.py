@@ -71,17 +71,17 @@ class Settings(BaseSettings):
     # FILE PATHS
     
     model_path: Path = Field(
-        default=Path("ml/artifacts/xgb_model.joblib"),
+        default=Path("ml/model/xgb_model.joblib"),
         description="Path to trained XGBoost model file. ML team provides this."
     )
     
     data_path: Path = Field(
-        default=Path("data_pipelines/delhi_pm25_features.csv"),
+        default=Path("ml/data/delhi_pm25_features.csv"),
         description="Path to PM2.5 features CSV data"
     )
     
     feature_metadata_path: Path = Field(
-        default=Path("ml/artifacts/feature_metadata.json"),
+        default=Path("ml/model/metadata.json"),
         description="Path to feature column names and imputation values"
     )
     

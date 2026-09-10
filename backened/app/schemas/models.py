@@ -573,8 +573,8 @@ class PaginatedResponse(BaseModel):
 # ============================================
 
 # Configure JSON schema for all models
-BaseModel.model_config = {
-    "json_schema_extra": {
-        "examples": {}
-    }
-}
+# BaseModel.model_config = {
+#     "json_schema_extra": {
+#         "examples": {}
+#     }
+# }
